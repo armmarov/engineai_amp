@@ -1,2 +1,2 @@
 motions:
-  - file: ../data/locomotion.npz
+  - file: ../data/accad_male2_run.npz
