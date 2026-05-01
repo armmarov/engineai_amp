@@ -22,6 +22,17 @@ parser.add_argument("--num_envs", type=int, default=None, help="Number of enviro
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
 parser.add_argument("--seed", type=int, default=None, help="Seed used for the environment")
 parser.add_argument("--max_iterations", type=int, default=None, help="RL Policy training iterations.")
+parser.add_argument(
+    "--motion-file",
+    "--motion_file",
+    dest="motion_file",
+    type=str,
+    default=None,
+    help=(
+        "Override the AMP dataset source. Accepts a single .npz, a .yaml manifest, or a directory "
+        "of .npz files. Falls back to agent_cfg.dataset_path when omitted. AMP tasks only."
+    ),
+)
 
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
@@ -76,6 +87,11 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     agent_cfg.max_iterations = (
         args_cli.max_iterations if args_cli.max_iterations is not None else agent_cfg.max_iterations
     )
+    if args_cli.motion_file is not None:
+        if not hasattr(agent_cfg, "dataset_path"):
+            raise ValueError("--motion-file is only supported for AMP tasks (agent_cfg has no dataset_path).")
+        agent_cfg.dataset_path = args_cli.motion_file
+        print(f"[INFO] AMP motion source overridden via CLI: {agent_cfg.dataset_path}")
 
     # set the environment seed
     # note: certain randomizations occur in the environment initialization so we set the seed here
