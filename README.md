@@ -96,6 +96,70 @@ PM01|`Flat-AMP-PM01-v0`|AMP-based motion imitation on flat terrain
 
 Replace `<name>` with the name of your training run (found in logs/rsl_rl/).
 
+### Makefile shortcuts
+
+A `Makefile` at the repo root wraps the most common training/rollout invocations. Run `make help` to see everything.
+
+| Command | What it does |
+|---|---|
+| `make train-ppo RUN_NAME=<name>` | Pure PPO velocity-tracking on `Flat-PM01-v0`. |
+| `make train-amp RUN_NAME=<name> [MOTION=<path>]` | PPO+AMP on `Flat-AMP-PM01-v0`. Picks the AMP reference from `MOTION` (`.npz`, `.yaml` manifest, or directory). Falls back to `dataset/config/dataset.yaml` when omitted. |
+| `make play-ppo RUN_NAME=<run_folder>` | Replay a PPO checkpoint. `RUN_NAME` here is the timestamped folder under `logs/rsl_rl/<exp>/`. |
+| `make play-amp RUN_NAME=<run_folder>` | Replay an AMP checkpoint. |
+
+Common overrides: `NUM_ENVS=2048`, `MAX_ITERATIONS=5000`. Examples:
+
+```bash
+# Train PPO+AMP using a specific running motion
+make train-amp MOTION=dataset/data/accad_male2_run.npz RUN_NAME=run-001
+
+# Train pure PPO with a shorter run for a quick smoke test
+make train-ppo RUN_NAME=ppo-smoke MAX_ITERATIONS=1500
+
+# Roll out the trained AMP policy
+make play-amp RUN_NAME=2026-04-30_15-35-23_run-001 NUM_ENVS=16
+```
+
+The Makefile uses `venv/bin/python`. If your interpreter lives elsewhere, run `PYTHON=/path/to/python make ...` to override.
+
+### Custom AMP motion data
+
+AMP training picks reference motions from `dataset/config/dataset.yaml` (the default) or any `--motion-file` you pass at the CLI. Each `.npz` must follow the PM01 schema below:
+
+| Key | Shape | Required | Notes |
+|---|---|---|---|
+| `fps` | `(1,)` int64 | yes | Sampling rate of the clip. |
+| `joint_pos` | `(N, 23)` float32 | **yes** | 23-DOF PM01 joint positions, ordered as `PM_WAIST_DFS_JOINT_NAMES` in `source/engineai_lab/robots/pm01.py`. |
+| `joint_vel` | `(N, 23)` float32 | **yes** | Matching joint velocities. |
+| `body_pos_w`, `body_quat_w`, `body_lin_vel_w`, `body_ang_vel_w` | `(N, 24, …)` float32 | optional | Present in the shipped reference; not used by the AMP discriminator today. |
+
+To add a new motion to the AMP corpus:
+
+1. **Drop a compatible `.npz` into `dataset/data/`** (or convert one — see below).
+2. **Train with it** by passing `--motion-file` (or `MOTION=…` via the Makefile). Or list it in `dataset/config/dataset.yaml` to make it the new default.
+
+#### Converting unitree-style PM01 motions
+
+`unitree_rl_mjlab` ships PM01 motions in a 24-DOF schema (it includes a head joint). Use `make convert` to trim them to this repo's 23-DOF schema:
+
+```bash
+make convert SRC=/path/to/unitree_rl_mjlab/src/assets/motions/pm01/some_motion.npz
+# → dataset/data/some_motion.npz
+```
+
+Optionally override the output basename:
+
+```bash
+make convert SRC=/path/to/long_filename.npz NAME=my_clip
+# → dataset/data/my_clip.npz
+```
+
+Once converted, plug the file into AMP training:
+
+```bash
+make train-amp MOTION=dataset/data/some_motion.npz RUN_NAME=some_motion-001
+```
+
 ### Deployment
 
 To deploy a trained policy on real hardware, convert it to the MNN format for efficient inference.
