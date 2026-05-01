@@ -1,5 +1,7 @@
 .venv/
+venv/
 *.vscode/
+.idea/
 build/
 *.egg-info/
 *__pycache__/
@@ -7,3 +9,4 @@ build/
 *outputs/
 dataset/
 models/
+IsaacLab/
